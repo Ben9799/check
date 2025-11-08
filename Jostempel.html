@@ -1,0 +1,1063 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Arbeitszeiterfassung - Multi-User (Chef-Admin) • Fix</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      min-height: 100vh; 
+      background: linear-gradient(to bottom right, #f0f9ff, #ffffff, #f0f9ff);
+    }
+    .user-modal { position: fixed; inset: 0; background: rgba(0,0,0,.7); display:flex; align-items:center; justify-content:center; z-index: 9999; backdrop-filter: blur(8px); }
+    .user-modal.hidden { display:none; }
+    .user-selection { background:#fff; border-radius:1.25rem; padding:2rem; width:min(520px,92%); box-shadow:0 25px 50px rgba(0,0,0,.25); }
+    .user-selection h2 { font-size:1.75rem; margin-bottom:.25rem; }
+    .user-selection p { color:#6b7280; margin-bottom:1.25rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display:block; margin-bottom:.35rem; font-weight:600; }
+    .form-group input { width:100%; padding:.9rem 1rem; border-radius:.75rem; border:2px solid #d1d5db; font-size:1rem; }
+    .form-group input:focus{ outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.12); }
+    .login-btn { width:100%; padding:.9rem 1rem; border:none; background:#2563eb; color:#fff; font-weight:700; border-radius:.75rem; cursor:pointer; }
+    .error-msg{ display:none; margin-top:.75rem; color:#b91c1c; background:#fee2e2; border:1px solid #fecaca; padding:.5rem .75rem; border-radius:.5rem; text-align:center; font-weight:700; }
+    .header { background: linear-gradient(to right, #2563eb, #1e40af); color:#fff; padding:2rem 1rem; position:relative; }
+    .header.bence-mode { background: linear-gradient(to right, #16a34a, #15803d); }
+    .header.chef-mode { background: linear-gradient(to right, #7c3aed, #6d28d9); }
+    .current-user-badge { position:absolute; top:1rem; right:1rem; background:rgba(255,255,255,.2); border:2px solid rgba(255,255,255,.35); backdrop-filter: blur(8px); border-radius:9999px; padding:.5rem .9rem; display:flex; gap:.5rem; cursor:pointer; }
+    .header-content { max-width:80rem; margin:0 auto; display:flex; align-items:center; justify-content:space-between; }
+    .container { max-width:80rem; margin:0 auto; padding:1.5rem; }
+    .control-panel{ background:#fff; border:2px solid #dbeafe; border-radius:1rem; padding:1rem; margin-bottom:1.25rem; box-shadow:0 4px 10px rgba(0,0,0,.06); }
+    .control-panel.chef-mode{ border-color:#e9d5ff; }
+    .controls-top{ display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem; }
+    select{ padding:.6rem .8rem; border-radius:.6rem; border:2px solid #93c5fd; font-weight:600; }
+    .button-group { display:flex; gap:.5rem; flex-wrap:wrap; }
+    button{ padding:.6rem .9rem; border:none; border-radius:.6rem; font-weight:700; cursor:pointer; display:flex; gap:.4rem; align-items:center; }
+    .btn-blue{ background:#2563eb; color:#fff; } .btn-amber{ background:#d97706; color:#fff; } .btn-green{ background:#16a34a; color:#fff; } .btn-red{ background:#dc2626; color:#fff; }
+    .monthly-summary{ border-radius:.75rem; padding:1rem; display:flex; align-items:center; justify-content:space-between; border:2px solid; }
+    .monthly-summary.positive{ background:linear-gradient(to right,#f0fdf4,#dcfce7); border-color:#86efac; }
+    .monthly-summary.negative{ background:linear-gradient(to right,#fef2f2,#fee2e2); border-color:#fca5a5; }
+    .monthly-summary .total{ font-size:1.5rem; font-weight:900; }
+    .day-card{ margin-bottom:.6rem; border:2px solid #bfdbfe; border-radius:.75rem; padding:1rem; background:#fff; cursor:pointer; }
+    .day-card.expanded{ border-color:#2563eb; box-shadow:0 0 0 4px rgba(37,99,235,.12); }
+    .day-header{ display:flex; justify-content:space-between; align-items:center; }
+    .day-number{ font-size:1.6rem; font-weight:900; width:2.6rem; }
+    .diff-badge{ padding:.35rem .6rem; border-radius:.5rem; border:2px solid; font-weight:800; }
+    .diff-badge.positive{ background:#dcfce7; color:#166534; border-color:#86efac; }
+    .diff-badge.negative{ background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+    .day-details{ display:none; margin-top:1rem; padding-top:1rem; border-top:2px solid #e5e7eb; }
+    .day-card.expanded .day-details{ display:block; }
+    .time-input{ width:7rem; padding:.5rem .7rem; border:2px solid #d1d5db; border-radius:.5rem; }
+    .chef-view-info{ background:#ede9fe; border:2px solid #e9d5ff; border-radius:.75rem; padding:1rem; margin-bottom:1rem; color:#6b21a8; font-weight:800; }
+    .user-tabs{ display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .user-tab{ padding:.55rem .8rem; border:2px solid #e5e7eb; border-radius:.6rem; background:#fff; font-weight:800; }
+    .user-tab.active{ background:#7c3aed; border-color:#7c3aed; color:#fff; }
+    .user-tab .pill{ margin-left:.35rem; font-size:.8rem; font-weight:900; background:#fee2e2; color:#991b1b; padding:.05rem .35rem; border-radius:9999px; border:1px solid #fca5a5; }
+    .calendar-wrap{ background:#fff; border:2px solid #dbeafe; border-radius:1rem; box-shadow:0 4px 10px rgba(0,0,0,.06); margin-bottom:1rem; overflow:hidden; }
+    .calendar-header{ display:flex; align-items:center; justify-content:space-between; padding:.75rem 1rem; background:#eff6ff; border-bottom:2px solid #dbeafe; }
+    .calendar-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:#e5e7eb; }
+    .calendar-cell,.calendar-dow{ background:#fff; min-height:90px; padding:.5rem; }
+    .calendar-dow{ background:#f3f4f6; font-weight:900; text-align:center; }
+    .calendar-daynum{ font-weight:900; color:#374151; }
+    .badge{ display:inline-block; font-size:.8rem; font-weight:900; padding:.2rem .5rem; border-radius:9999px; margin-top:.35rem; border:1px solid rgba(0,0,0,.06); white-space:nowrap; cursor:pointer; }
+    .badge.pending{ opacity:.75; outline:2px dashed #7c3aed; }
+    .badge.thomas{ background:#dbeafe; } .badge.bence{ background:#bbf7d0; } .badge.chef{ background:#e9d5ff; } .badge.other{ background:#fde68a; }
+    .hidden{ display:none; }
+    .admin-panel{ background:#fff; border:2px solid #e9d5ff; border-radius:1rem; padding:1rem; margin:1rem 0; }
+    .admin-grid{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+    .admin-card{ border:2px solid #e5e7eb; border-radius:.75rem; padding:1rem; }
+    .admin-row{ display:flex; gap:.5rem; margin:.35rem 0; }
+    .admin-row input{ flex:1; padding:.55rem .7rem; border:2px solid #d1d5db; border-radius:.5rem; }
+    .user-list{ display:flex; flex-direction:column; gap:.5rem; max-height:240px; overflow:auto; }
+    .user-item{ display:flex; align-items:center; justify-content:space-between; padding:.45rem .65rem; border:1px solid #e5e7eb; border-radius:.6rem; background:#faf5ff; }
+    .toast{ position:fixed; left:50%; transform:translateX(-50%); bottom:1rem; background:#16a34a; color:#fff; font-weight:900; padding:.6rem .8rem; border-radius:.6rem; box-shadow:0 10px 20px rgba(0,0,0,.15); z-index:99999; opacity:0; pointer-events:none; transition:opacity .25s, bottom .25s; }
+    .toast.error{ background:#dc2626; } .toast.show{ opacity:1; bottom:2rem; }
+    /* --- Modern stamp gombok (Kommen / Gehen) --- */
+.stamp-actions {
+  display: flex;
+  gap: .75rem;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn-stamp {
+  position: relative;
+  padding: .9rem 1.25rem;
+  border: none;
+  border-radius: 9999px;
+  font-weight: 900;
+  letter-spacing: .2px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0,0,0,.08);
+  transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease;
+  color: #fff;
+  user-select: none;
+}
+
+.btn-stamp--start {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+.btn-stamp--end {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.btn-stamp:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(0,0,0,.12);
+}
+.btn-stamp:active {
+  transform: translateY(0) scale(.98);
+}
+
+.btn-stamp[disabled] {
+  opacity: .55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* kis „megnyílás” animáció a nap részleteire */
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.day-card.expanded .day-details {
+  animation: dropIn .18s ease-out;
+}
+
+/* kapszula-stílus az időértékekhez */
+.time-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .45rem .7rem;
+  border-radius: .6rem;
+  border: 2px solid #e5e7eb;
+  background: #f9fafb;
+  font-weight: 800;
+}
+
+.sep-arrow { opacity: .6; font-weight: 900; }
+
+/* egyszerű „ripple” érzet kattintásra */
+.btn-stamp::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  transform: scale(0.9);
+  opacity: 0;
+  transition: opacity .35s, transform .35s;
+  background: radial-gradient(circle at center, rgba(255,255,255,.35), rgba(255,255,255,0) 60%);
+}
+.btn-stamp:active::after {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div class="user-modal" id="userModal">
+    <div class="user-selection">
+      <h2>🔐 Anmeldung</h2>
+      <p>Gib dein Passwort ein</p>
+      <div class="form-group">
+        <label for="passwordInput">Passwort</label>
+        <input type="password" id="passwordInput" placeholder="Passwort eingeben"
+               onkeydown="if(event.key==='Enter'){ event.preventDefault(); loginUser(); }"
+               onkeypress="if(event.key==='Enter'){ event.preventDefault(); loginUser(); }"/>
+      </div>
+      <button class="login-btn" onclick="loginUser()">🔓 Anmelden</button>
+      <div id="errorMsg" class="error-msg">Falsches Passwort!</div>
+    </div>
+  </div>
+
+  <div class="header" id="header">
+    <div class="current-user-badge" onclick="app.showUserSelection()">
+      <span id="userAvatar">👤</span>
+      <span id="userName">Benutzer</span>
+      <span>🔄</span>
+    </div>
+    <div class="header-content">
+      <div>
+        <h1>Pertl Präzisionstechnik</h1>
+        <p>Arbeitszeiterfassung</p>
+      </div>
+      <div style="font-size: 3.2rem;">🕐</div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="control-panel" id="controlPanel">
+      <div id="chefView" class="chef-view-info hidden">Chef-Ansicht: Alle Mitarbeiter</div>
+      <div id="userTabsContainer" class="user-tabs hidden"></div>
+
+      <div class="controls-top">
+        <select id="monthSelect"></select>
+        <select id="yearSelect"></select>
+        <div class="button-group">
+  <button id="btnExport" class="btn-blue"  onclick="app.exportData()">⬇️ Export</button>
+  <button id="btnExcel"  class="btn-amber" onclick="app.exportExcel()">📊 Excel</button>
+  <button id="btnImport" class="btn-green" onclick="app.importData()">⬆️ Import</button>
+  <button id="btnDelete" class="btn-red"   onclick="app.clearAllData()">🗑️ Löschen</button>
+  <button id="btnCal"    class="btn-blue"  onclick="app.toggleCalendar()">📅 Kalender</button>
+  <button id="btnLogout" class="btn-blue"  onclick="app.logout()">🚪 Abmelden</button>
+</div>
+      </div>
+
+      <div class="monthly-summary" id="monthlySummary">
+        <h2>Monatsbilanz <span id="monthYearDisplay"></span>:</h2>
+        <div class="total" id="totalDisplay">+0h 0min</div>
+      </div>
+    </div>
+
+    <!-- Chef Admin Panel -->
+    <div id="adminPanel" class="admin-panel hidden">
+      <div class="admin-title">👑 Chef – Benutzerverwaltung</div>
+      <div class="admin-grid">
+        <div class="admin-card">
+          <h3>Neuen Benutzer anlegen</h3>
+          <div class="admin-row"><input id="newUserId" placeholder="ID (z.B. emily)" /></div>
+          <div class="admin-row"><input id="newUserName" placeholder="Name (z.B. Emily)" /></div>
+          <div class="admin-row"><input id="newUserPass" placeholder="Passwort (z.B. 123456)" /></div>
+          
+          <div class="admin-row">
+            <button class="btn-green" onclick="admin.createUser()">➕ Benutzer erstellen</button>
+          </div>
+        </div>
+        <div class="admin-card">
+          <h3>Bestehende Benutzer</h3>
+          <div id="userList" class="user-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="calendarSection" class="calendar-wrap hidden">
+      <div class="calendar-header">
+        <div class="calendar-toolbar">
+          <button class="btn-blue" onclick="cal.prev()">◀</button>
+          <div class="small" id="calMonthYear"></div>
+          <button class="btn-blue" onclick="cal.next()">▶</button>
+          <button class="btn-blue" onclick="cal.gotoToday()">Heute</button>
+        </div>
+        <div class="calendar-controls">
+          <select id="vacUser"></select>
+          <input id="vacLabel" placeholder="Bemerkung (optional)" />
+          <input type="date" id="vacStart" />
+          <input type="date" id="vacEnd" />
+          <button id="vacAddBtn" class="btn-green" onclick="cal.addVacation()">➕ Eintragen</button>
+        </div>
+      </div>
+      <div class="calendar-grid" id="calGrid"></div>
+    </div>
+
+    <div id="daysList"></div>
+  </div>
+
+  <script>
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyCFbO8Vv7yTNL-fQIAFzG4h-W4-61Dj_L4",
+      authDomain: "pertlzeit.firebaseapp.com",
+      projectId: "pertlzeit",
+      storageBucket: "pertlzeit.firebasestorage.app",
+      messagingSenderId: "591698679819",
+      appId: "1:591698679819:web:23df81f59841d6b63ecf0e",
+      measurementId: "G-6VWWHFMVL2"
+    };
+
+    let fb = { app: null, auth: null, db: null, ready: false };
+
+    // ===== Users state (dynamic) =====
+    let USERS = [
+      { id:'thomas', name:'Thomas', pass:'831531', avatar:'👨‍💼', role:'user', badgeClass:'thomas' },
+      { id:'bence',  name:'Bence',  pass:'150619', avatar:'👨‍💻', role:'user', badgeClass:'bence'  },
+      { id:'chef',   name:'Chef',   pass:'000000', avatar:'👨‍🍳', role:'chef', badgeClass:'chef'   },
+    ];
+
+    function initCloudIfConfigured() {
+      try {
+        if (!FIREBASE_CONFIG || FIREBASE_CONFIG.apiKey === "PASTE_API_KEY") return;
+        fb.app = firebase.initializeApp(FIREBASE_CONFIG);
+        fb.auth = firebase.auth();
+        fb.db = firebase.firestore();
+        fb.db.enablePersistence({ synchronizeTabs: true }).catch(()=>{});
+        fb.ready = true;
+        showToast('✅ Firebase verbunden');
+      } catch (e) {
+        console.warn('Firebase init failed:', e);
+      }
+    }
+
+    function showToast(msg, isError=false) {
+      const el = document.getElementById('toast');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'toast' + (isError ? ' error' : '');
+      void el.offsetWidth;
+      el.classList.add('show');
+      setTimeout(()=>{ el.classList.remove('show'); }, 1600);
+    }
+
+    // ===== Admin helper =====
+    const admin = {
+      async loadUsers(){
+        if (fb && fb.ready && fb.db){
+          try {
+            const snap = await fb.db.collection('users').get();
+            const arr = []; snap.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+            if (arr.length){
+              USERS = arr.map(x => ({
+                id: x.id, name: x.name || x.id, pass: x.pass || '',
+                avatar: x.avatar || '👤', role: x.role || 'user',
+                badgeClass: x.badgeClass || (x.id in {thomas:1,bence:1,chef:1}? x.id : 'other')
+              }));
+            } else {
+              await Promise.all(USERS.map(u => fb.db.collection('users').doc(u.id).set(u, {merge:true})));
+            }
+          } catch(e){
+            console.warn('loadUsers failed, fallback localStorage', e);
+            admin.loadUsersLocal();
+          }
+        } else { admin.loadUsersLocal(); }
+        admin.renderAdmin(); app.refreshUserDependentUI();
+      },
+      loadUsersLocal(){
+        try{
+          const raw = localStorage.getItem('users_list');
+          if (raw){ const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) USERS = arr; }
+          else { localStorage.setItem('users_list', JSON.stringify(USERS)); }
+        } catch{}
+      },
+      saveUsersLocal(){ localStorage.setItem('users_list', JSON.stringify(USERS)); },
+
+      async createUser(){
+  const id = (document.getElementById('newUserId').value||'').trim().toLowerCase();
+  const name = (document.getElementById('newUserName').value||'').trim();
+  const pass = (document.getElementById('newUserPass').value||'').trim();
+  if (!id || !pass){ showToast('ID und Passwort nötig', true); return; }
+  if (USERS.find(u => u.id === id)){ showToast('ID existiert bereits', true); return; }
+  const user = { id, name: name||id, pass, role:'user', badgeClass:'other' }; // ← avatar kivéve
+  USERS.push(user);
+  if (fb && fb.ready && fb.db){
+    try {
+      await fb.db.collection('users').doc(id).set(user, {merge:true});
+      await fb.db.collection('timetracking').doc(id).set({ data: {}, createdAt: new Date().toISOString() }, { merge: true });
+      showToast('✅ Benutzer erstellt');
+    } catch(e){ console.warn(e); showToast('⚠️ Konnte Cloud nicht speichern', true); }
+  } else { admin.saveUsersLocal(); showToast('✅ Benutzer lokal erstellt'); }
+  cal.syncVacUserOptions(); admin.renderAdmin(); app.renderUserTabs();
+},
+
+      async deleteUser(id){
+        if (!confirm(`Benutzer "${id}" wirklich löschen?`)) return;
+        if (id === 'chef'){ showToast('Chef kann nicht gelöscht werden', true); return; }
+        USERS = USERS.filter(u => u.id !== id);
+        if (fb && fb.ready && fb.db){
+          try {
+            await fb.db.collection('timetracking').doc(id).delete().catch(()=>{});
+            const vs = await fb.db.collection('vacations').where('user','==',id).get();
+            const batch = fb.db.batch(); vs.forEach(doc => batch.delete(doc.ref)); await batch.commit().catch(()=>{});
+            await fb.db.collection('users').doc(id).delete().catch(()=>{});
+            showToast('🗑️ Benutzer gelöscht');
+          } catch(e){ console.warn(e); showToast('⚠️ Cloud-Löschung teilweise fehlgeschlagen', true); }
+        } else {
+          localStorage.removeItem(`time_${id}`);
+          try{
+            const vacRaw = localStorage.getItem(cal._localKey);
+            if (vacRaw){ const arr = JSON.parse(vacRaw)||[]; const rest = arr.filter(x => x.user !== id); localStorage.setItem(cal._localKey, JSON.stringify(rest)); }
+          }catch{}
+          admin.saveUsersLocal(); showToast('🗑️ Benutzer lokal gelöscht');
+        }
+        if (app.viewedUser === id){ app.viewedUser = (USERS.find(u => u.id !== 'chef')||{}).id || null; }
+        admin.renderAdmin(); app.refreshUserDependentUI(); cal.bindRealtime();
+      },
+
+      renderAdmin(){
+        const panel = document.getElementById('adminPanel');
+        if (app.currentUser !== 'chef'){ panel.classList.add('hidden'); return; }
+        panel.classList.remove('hidden');
+        const list = document.getElementById('userList'); list.innerHTML = '';
+        USERS.filter(u => u.id !== 'chef').forEach(u => {
+          const row = document.createElement('div'); row.className = 'user-item';
+          const meta = document.createElement('div'); meta.className = 'user-meta';
+          meta.innerHTML = `<strong>${u.name}</strong><span style="font-family:ui-monospace;background:#fff;border:1px solid #e5e7eb;padding:.05rem .35rem;border-radius:.35rem;margin-left:.5rem;">${u.id}</span>`;
+
+          const del = document.createElement('button'); del.className = 'btn-red'; del.textContent = 'Löschen'; del.onclick = () => admin.deleteUser(u.id);
+          row.appendChild(meta); row.appendChild(del); list.appendChild(row);
+        });
+      }
+    };
+
+    // ===== Helpers for legacy/new key formats =====
+    function key0(y,m,d){ return `${y}-${m}-${d}`; }      // NEW: month 0-based
+    function key1(y,m,d){ return `${y}-${m+1}-${d}`; }    // LEGACY: month 1-based
+
+    function getEntryCompat(store, y, m, d){
+      // Prefer NEW, but accept LEGACY. If legacy exists, mirror into new for rendering continuity.
+      const k0 = key0(y,m,d), k1s = key1(y,m,d);
+      let e = store[k0] || store[k1s] || {};
+      // Normalize values like "800" -> "08:00" if needed happens in update path, calcDiff tolerates both.
+      return e;
+    }
+
+    function setEntryCompat(store, y, m, d, field, value){
+      const k0 = key0(y,m,d), k1s = key1(y,m,d);
+      if (!store[k0]) store[k0] = {};
+      if (!store[k1s]) store[k1s] = {}; // keep legacy mirror for kompatibilität
+      store[k0][field] = value;
+      store[k1s][field] = value;
+    }
+
+    // ===== Login using dynamic USERS =====
+    function loginUser() {
+      const passRaw = document.getElementById('passwordInput').value || '';
+      const pass = passRaw.trim();
+      const errorMsg = document.getElementById('errorMsg');
+      const user = USERS.find(u => u.pass === pass);
+      if (user) { app.selectUser(user.id); document.getElementById('passwordInput').value=''; errorMsg.style.display='none'; }
+      else { errorMsg.textContent='Falsches Passwort!'; errorMsg.style.display='block'; document.getElementById('passwordInput').value=''; document.getElementById('passwordInput').focus(); }
+    }
+
+    const months = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+    const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+    function parseTime(str) {
+      if (!str) return null;
+      const s = (''+str).trim();
+      if (/^\d{1,2}$/.test(s)) return parseInt(s) * 60;
+      if (/^\d{3,4}$/.test(s)) { const h = parseInt(s.slice(0, -2)); const m = parseInt(s.slice(-2)); return h * 60 + m; }
+      const m = s.match(/^(\d{1,2}):(\d{2})$/);
+      if (m) return parseInt(m[1]) * 60 + parseInt(m[2]);
+      return null;
+    }
+
+    function formatTime(mins) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+
+    function calcDiff(entry) {
+      const s1 = parseTime(entry.s1); const e1 = parseTime(entry.e1);
+      if (s1 == null || e1 == null) return 0;
+      let total = e1 - s1;
+      const s2 = parseTime(entry.s2); const e2 = parseTime(entry.e2);
+      if (s2 != null && e2 != null) total += e2 - s2;
+      const s3 = parseTime(entry.s3); const e3 = parseTime(entry.e3);
+      if (s3 != null && e3 != null) total += e3 - s3;
+      return total - 480; // 8h Sollzeit
+    }
+
+    const cal = {
+      year: new Date().getFullYear(),
+      month: new Date().getMonth(),
+      items: [], unsub: null,
+      _localKey: 'vacations_shared',
+      colors: { thomas: 'thomas', bence: 'bence', chef: 'chef', other: 'other' },
+
+      mount(){ this.renderHeader(); this.renderGrid(); this.bindRealtime(); this.enforceUserLock(); },
+      enforceUserLock(){
+        const sel = document.getElementById('vacUser'); const btn = document.getElementById('vacAddBtn');
+        if (!sel || !btn) return;
+        if (!app.currentUser){ sel.disabled = true; btn.disabled = true; btn.title = 'Bitte zuerst anmelden'; return; }
+        if (app.currentUser === 'chef'){ sel.value = 'chef'; sel.disabled = true; btn.disabled = true; btn.title = 'Chef kann nicht eintragen'; return; }
+        sel.value = app.currentUser; sel.disabled = true; btn.disabled = false; btn.title = '';
+      },
+      syncVacUserOptions(){
+        const sel = document.getElementById('vacUser'); if (!sel) return;
+        sel.innerHTML = '';
+        USERS.filter(u => u.role !== 'chef').forEach(u => { const opt = document.createElement('option'); opt.value = u.id; opt.textContent = u.name; sel.appendChild(opt); });
+        const optChef = document.createElement('option'); optChef.value = 'chef'; optChef.textContent = 'Chef'; sel.appendChild(optChef);
+        const optOther = document.createElement('option'); optOther.value = 'other'; optOther.textContent = 'Andere'; sel.appendChild(optOther);
+      },
+      bindRealtime(){
+        if (fb && fb.ready && fb.db) {
+          try {
+            if (this.unsub) this.unsub();
+            this.unsub = fb.db.collection('vacations').orderBy('start').onSnapshot(snap => {
+              const arr = []; snap.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
+              this.items = arr; this.renderGrid(); if (app.currentUser === 'chef'){ app.renderUserTabs(); }
+            }, err => { console.warn('onSnapshot error', err); this.loadFromLocal(); });
+          } catch (e) { console.warn('bindRealtime failed', e); this.loadFromLocal(); }
+        } else { this.loadFromLocal(); }
+      },
+      loadFromLocal(){ try { const raw = localStorage.getItem(this._localKey); this.items = raw ? JSON.parse(raw) : []; } catch { this.items = []; } this.renderGrid(); if (app.currentUser === 'chef'){ app.renderUserTabs(); } },
+      saveLocal(){ localStorage.setItem(this._localKey, JSON.stringify(this.items)); },
+      prev(){ this.month--; if(this.month<0){this.month=11; this.year--;} this.renderHeader(); this.renderGrid(); },
+      next(){ this.month++; if(this.month>11){this.month=0; this.year++;} this.renderHeader(); this.renderGrid(); },
+      gotoToday(){ this.year=new Date().getFullYear(); this.month=new Date().getMonth(); this.renderHeader(); this.renderGrid(); },
+      monthName(){ return months[this.month] + ' ' + this.year; },
+      renderHeader(){ document.getElementById('calMonthYear').textContent = this.monthName(); },
+      addVacation(){
+        if (!app.currentUser) { showToast('Bitte zuerst anmelden', true); return; }
+        if (app.currentUser === 'chef') { showToast('Chef kann nicht eintragen', true); return; }
+        const user = app.currentUser;
+        const label = (document.getElementById('vacLabel').value || '').trim();
+        const start = document.getElementById('vacStart').value;
+        const end = document.getElementById('vacEnd').value || start;
+        if (!start) { showToast('Bitte Startdatum wählen', true); return; }
+        const item = { user, label: label || 'Urlaub', start, end, createdBy: app.currentUser || user, createdAt: new Date().toISOString(), approved: false, approvedBy: null, approvedAt: null };
+        if (fb && fb.ready && fb.db) {
+          fb.db.collection('vacations').add(item).then(()=>{
+            showToast('⏳ Eingetragen – wartet auf Freigabe');
+            document.getElementById('vacLabel').value=''; document.getElementById('vacStart').value=''; document.getElementById('vacEnd').value='';
+          }).catch(()=> showToast('Fehler beim Speichern', true));
+        } else {
+          item.id = 'local_'+Date.now(); this.items.push(item); this.saveLocal(); this.renderGrid(); showToast('⏳ Eingetragen (lokal) – wartet auf Freigabe');
+          document.getElementById('vacLabel').value=''; document.getElementById('vacStart').value=''; document.getElementById('vacEnd').value='';
+        }
+      },
+      deleteVacation(id){
+        const idx = this.items.findIndex(x => x.id === id);
+        const entry = idx >= 0 ? this.items[idx] : null;
+        if (entry && entry.approved && app.currentUser !== 'chef'){ showToast('❌ Nur der Chef darf genehmigte Einträge löschen', true); return; }
+        if (fb && fb.ready && fb.db) { fb.db.collection('vacations').doc(id).delete().then(()=> showToast('🗑️ Gelöscht')); }
+        else { this.items = this.items.filter(x=>x.id!==id); this.saveLocal(); this.renderGrid(); showToast('🗑️ Gelöscht'); }
+      },
+      approveVacation(id){
+        if (app.currentUser !== 'chef') return;
+        if (fb && fb.ready && fb.db) {
+          fb.db.collection('vacations').doc(id).update({ approved: true, approvedBy: app.currentUser, approvedAt: new Date().toISOString() }).then(()=> showToast('✅ Urlaub freigegeben'));
+        } else {
+          const i = this.items.findIndex(x => x.id === id);
+          if (i >= 0) { this.items[i].approved = true; this.items[i].approvedBy = app.currentUser; this.items[i].approvedAt = new Date().toISOString(); this.saveLocal(); this.renderGrid(); showToast('✅ Urlaub freigegeben (lokal)'); }
+        }
+      },
+      _range(start, end){ const a = new Date(start+'T00:00:00'); const b = new Date((end||start)+'T00:00:00'); const out = []; for (let d = new Date(a); d <= b; d.setDate(d.getDate()+1)) { out.push(d.toISOString().slice(0,10)); } return out; },
+      renderGrid(){
+        const grid = document.getElementById('calGrid'); grid.innerHTML = '';
+        const viewer = app.currentUser;
+        const sourceItems = (viewer === 'chef') ? (this.items || []) : (this.items || []).filter(it => !!it.approved || it.createdBy === viewer);
+        const dows = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+        dows.forEach(d => { const h = document.createElement('div'); h.className = 'calendar-dow'; h.textContent = d; grid.appendChild(h); });
+        const first = new Date(this.year, this.month, 1);
+        const startCol = (first.getDay()+6)%7;
+        const daysInMonth = new Date(this.year, this.month+1, 0).getDate();
+        for (let i=0;i<startCol;i++){ const c = document.createElement('div'); c.className = 'calendar-cell'; grid.appendChild(c); }
+        const map = {}; (sourceItems||[]).forEach(it => { this._range(it.start, it.end).forEach(d => { if (!map[d]) map[d]=[]; map[d].push(it); }); });
+        for (let day=1; day<=daysInMonth; day++){
+          const dateStr = `${this.year}-${String(this.month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+          const cell = document.createElement('div'); cell.className = 'calendar-cell';
+          const num = document.createElement('div'); num.className = 'calendar-daynum'; num.textContent = day; cell.appendChild(num);
+          const entries = map[dateStr] || [];
+          entries.forEach(e => {
+            const b = document.createElement('div');
+            const who = e.user || 'other';
+            const label = (e.label || '').trim();
+            const isPending  = !e.approved;
+            const isCreator  = e.createdBy === app.currentUser;
+            const showPendingTag = isPending && (app.currentUser === 'chef' || isCreator);
+            const badgeClass = (USERS.find(u=>u.id===who)?.badgeClass) || (this.colors[who] || 'other');
+            const displayName = (USERS.find(u=>u.id===who)?.name) || who;
+            b.className = `badge ${badgeClass}` + (isPending ? ' pending' : '');
+            b.textContent = (label ? label+' ' : '') + displayName + (showPendingTag ? ' (beantragt)' : '');
+            const isApproved = !!e.approved;
+            if (app.currentUser === 'chef' && !isApproved){ b.title = 'Klick zum Freigeben'; b.onclick = (ev)=>{ ev.stopPropagation(); if (confirm('Urlaub freigeben?')) this.approveVacation(e.id); }; }
+            else if (app.currentUser === 'chef' && isApproved){ b.title = 'Klick zum Löschen'; b.onclick = (ev)=>{ ev.stopPropagation(); if (confirm('Eintrag löschen?')) this.deleteVacation(e.id); }; }
+            else if (isApproved){ b.title = 'Genehmigt'; b.style.cursor = 'default'; b.onclick = null; }
+            else { b.title = 'Klick zum Löschen'; b.onclick = (ev)=>{ ev.stopPropagation(); if (confirm('Eintrag löschen?')) this.deleteVacation(e.id); }; }
+            cell.appendChild(b);
+          });
+          grid.appendChild(cell);
+        }
+      }
+    };
+
+    const app = {
+      currentUser: null, viewedUser: null,
+      month: new Date().getMonth(), year: new Date().getFullYear(),
+      allUserData: {}, expanded: null,
+
+      init(){
+        admin.loadUsers().then(()=>{
+          const savedUser = localStorage.getItem('currentUser');
+          if (savedUser && USERS.find(u => u.id === savedUser)){
+            this.currentUser = savedUser;
+            this.viewedUser = (savedUser === 'chef') ? (USERS.find(u => u.id !== 'chef')?.id || null) : savedUser;
+            document.getElementById('userModal').classList.add('hidden');
+            this.updateUI();
+            this.loadData().then(()=>this.render());
+            this.scrollToToday(); cal.syncVacUserOptions(); cal.mount();
+          }
+        });
+      },
+
+      
+selectUser(userId){
+        this.currentUser = userId;
+        this.viewedUser = (userId === 'chef') ? (USERS.find(u => u.id !== 'chef')?.id || null) : userId;
+        localStorage.setItem('currentUser', userId);
+        document.getElementById('userModal').classList.add('hidden');
+        this.updateUI(); admin.renderAdmin();
+        this.loadData().then(()=>{ this.render(); this.scrollToToday(); });
+        cal.syncVacUserOptions(); cal.mount();
+      }
+,
+
+      showUserSelection(){
+        document.getElementById('userModal').classList.remove('hidden');
+        document.getElementById('passwordInput').value = '';
+        document.getElementById('errorMsg').style.display = 'none';
+      },
+
+      
+refreshUserDependentUI(){
+        if (this.currentUser === 'chef'){ this.renderUserTabs(); document.getElementById('chefView').classList.remove('hidden'); admin.renderAdmin(); }
+        cal.syncVacUserOptions();
+      }
+,
+
+      updateUI(){
+        const isChef = this.currentUser === 'chef';
+        const info = USERS.find(u => u.id === this.currentUser) || {name:'Benutzer', avatar:'👤'};
+        document.getElementById('userAvatar').textContent = info.avatar;
+        document.getElementById('userName').textContent = info.name;
+        let headerClass = 'header'; if (isChef) headerClass += ' chef-mode'; else if (this.currentUser==='bence') headerClass += ' bence-mode';
+        document.getElementById('header').className = headerClass;
+        let panelClass = 'control-panel'; if (isChef) panelClass += ' chef-mode'; else if (this.currentUser==='bence') panelClass += ' bence-mode';
+        document.getElementById('controlPanel').className = panelClass;
+        const chefView = document.getElementById('chefView');
+        const tabContainer = document.getElementById('userTabsContainer');
+        const adminPanel = document.getElementById('adminPanel');
+        if (isChef) { chefView.classList.remove('hidden'); tabContainer.classList.remove('hidden'); adminPanel.classList.remove('hidden'); this.renderUserTabs(); }
+        else { chefView.classList.add('hidden'); tabContainer.classList.add('hidden'); adminPanel.classList.add('hidden'); }
+      
+      // --- csak Chef láthatja ezeket a gombokat ---
+const chefOnly = ['btnExport','btnExcel','btnImport','btnDelete'];
+chefOnly.forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = (isChef ? '' : 'none');
+});
+
+// --- ezek mindig látszanak (usernek is) ---
+['btnCal','btnLogout'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = '';
+});
+
+      },
+
+      renderUserTabs(){
+        const tabContainer = document.getElementById('userTabsContainer');
+        tabContainer.innerHTML = '';
+        const nonChefUsers = USERS.filter(u => u.id !== 'chef');
+        const pendingCount = (userId) => (cal.items || []).filter(it => it.user === userId && !it.approved).length;
+        if (this.currentUser === 'chef') {
+          const total = nonChefUsers.reduce((sum, u) => sum + pendingCount(u.id), 0);
+          const chefView = document.getElementById('chefView');
+          if (chefView) { chefView.textContent = total > 0 ? `Chef-Ansicht: Alle Mitarbeiter — Urlaub beantragt: ${total}` : `Chef-Ansicht: Alle Mitarbeiter`; }
+        }
+        nonChefUsers.forEach(u => {
+          const tab = document.createElement('button');
+          tab.className = 'user-tab' + (this.viewedUser === u.id ? ' active' : '');
+          const cnt = pendingCount(u.id);
+          tab.innerHTML = u.name + (cnt > 0 ? ` <span class="pill">Urlaub beantragt (${cnt})</span>` : '');
+          tab.onclick = async () => {
+            this.viewedUser = u.id;
+            if (this.currentUser === 'chef' && fb && fb.ready && fb.db) {
+              if (!this.allUserData[u.id] || Object.keys(this.allUserData[u.id]).length === 0) {
+                await this.cloudLoadUser(u.id);
+              }
+            }
+            this.render(); this.renderUserTabs();
+          };
+          tabContainer.appendChild(tab);
+        });
+      },
+
+      toggleCalendar(){
+        const sec = document.getElementById('calendarSection');
+        sec.classList.toggle('hidden');
+        if (!sec.classList.contains('hidden')){ cal.renderHeader(); cal.renderGrid(); cal.enforceUserLock(); }
+      },
+
+      cloudDocRef(){ if (!fb.ready || !this.currentUser) return null; return fb.db.collection('timetracking').doc(this.currentUser); },
+      async cloudLoadUser(userId){
+        if (!fb.ready || !userId) return false;
+        try {
+          const ref = fb.db.collection('timetracking').doc(userId);
+          const snap = await ref.get();
+          if (snap.exists) { const payload = snap.data() || {}; this.allUserData[userId] = payload.data || {}; return true; }
+          else { await ref.set({ data: {}, createdAt: new Date().toISOString() }, { merge: true }); this.allUserData[userId] = {}; return true; }
+        } catch (e) { console.warn('cloudLoadUser failed', userId, e); return false; }
+      },
+      async cloudLoad(){
+        const ref = this.cloudDocRef(); if (!ref) return false;
+        try {
+          const snap = await ref.get();
+          if (snap.exists) { const payload = snap.data() || {}; this.allUserData[this.currentUser] = payload.data || {}; return true; }
+          else { await ref.set({ data: {}, createdAt: new Date().toISOString() }, { merge: true }); this.allUserData[this.currentUser] = {}; return true; }
+        } catch (e) { console.warn('Cloud load failed', e); }
+        return false;
+      },
+      async cloudSave(){
+        if (this.currentUser === 'chef') return false;
+        const ref = this.cloudDocRef(); if (!ref) return false;
+        try { await ref.set({ data: this.allUserData[this.currentUser], updatedAt: new Date().toISOString() }, { merge: true }); showToast('✅ Gespeichert in der Cloud'); return true; }
+        catch (e) { console.warn('Cloud save failed', e); showToast('❌ Cloud-Speichern fehlgeschlagen', true); }
+        return false;
+      },
+      
+            async cloudSaveFor(userId){
+        try {
+          if (!fb || !fb.ready || !fb.db) return false;
+          const ref = fb.db.collection('timetracking').doc(userId);
+          await ref.set(
+            { data: this.allUserData[userId], updatedAt: new Date().toISOString() },
+            { merge: true }
+          );
+          showToast('✅ Gespeichert in der Cloud');
+          return true;
+        } catch (e) {
+          console.warn('Cloud save (for user) failed', userId, e);
+          showToast('❌ Cloud-Speichern fehlgeschlagen', true);
+          return false;
+        }
+      },
+
+
+      async loadData(){
+        USERS.filter(u => u.id !== 'chef').forEach(u => { if (!this.allUserData[u.id]) this.allUserData[u.id] = {}; });
+        if (this.currentUser === 'chef') {
+          const targets = USERS.filter(u => u.id !== 'chef').map(u => u.id);
+          for (const u of targets){
+            let ok = false;
+            if (fb && fb.ready && fb.db) ok = await this.cloudLoadUser(u);
+            if (!ok){ const saved = localStorage.getItem(`time_${u}`); this.allUserData[u] = saved ? JSON.parse(saved) : {}; }
+          }
+          return;
+        }
+        const ref = this.cloudDocRef();
+        if (ref){
+          try {
+            const snap = await ref.get();
+            if (snap.exists){ const payload = snap.data() || {}; this.allUserData[this.currentUser] = payload.data || {}; return; }
+            else { await ref.set({ data: {}, createdAt: new Date().toISOString() }, { merge: true }); this.allUserData[this.currentUser] = {}; return; }
+          } catch (e) { console.warn('Cloud load failed', e); }
+        }
+        const saved = localStorage.getItem(`time_${this.currentUser}`);
+        this.allUserData[this.currentUser] = saved ? JSON.parse(saved) : {};
+      },
+
+      async saveData(){ localStorage.setItem(`time_${this.currentUser}`, JSON.stringify(this.allUserData[this.currentUser])); this.cloudSave(); },
+
+      getDisplayData(){ return (this.currentUser === 'chef') ? (this.allUserData[this.viewedUser] || {}) : (this.allUserData[this.currentUser] || {}); },
+
+      render(){
+        const sel = document.getElementById('monthSelect'); sel.innerHTML = ''; months.forEach((m,i)=>{ const opt=document.createElement('option'); opt.value=i; opt.textContent=m; sel.appendChild(opt); });
+        sel.value = this.month; sel.onchange = e => { this.month = parseInt(e.target.value); this.render(); };
+        const ySel = document.getElementById('yearSelect'); ySel.innerHTML = ''; for (let y=2023; y<=2027; y++){ const opt=document.createElement('option'); opt.value=y; opt.textContent=y; ySel.appendChild(opt); }
+        ySel.value = this.year; ySel.onchange = e => { this.year = parseInt(e.target.value); this.render(); };
+
+        const daysInMonth = new Date(this.year, this.month + 1, 0).getDate();
+        let total = 0; const data = this.getDisplayData();
+
+        const list = document.getElementById('daysList'); list.innerHTML = '';
+        const isChef = this.currentUser === 'chef';
+        const canEdit = !isChef || (isChef && this.viewedUser === this.currentUser);
+
+        for (let d=1; d<=daysInMonth; d++){
+          const entry = getEntryCompat(data, this.year, this.month, d);
+          const diff = calcDiff(entry);
+          total += diff;
+
+          const date = new Date(this.year, this.month, d);
+          const dayName = days[date.getDay()];
+          const card = document.createElement('div');
+          card.className = 'day-card' + (this.expanded === d ? ' expanded' : '');
+          card.id = `day-${d}`;
+
+          const diffSign = diff < 0 ? '-' : '+';
+          const diffAbs = Math.abs(diff);
+          const diffHtml = (entry && (entry.s1 || entry.e1 || entry.s2 || entry.e2 || entry.s3 || entry.e3))
+             ? `<span class="diff-badge ${diff >= 0 ? 'positive':'negative'}">${diffSign}${Math.floor(diffAbs/60)}h ${diffAbs%60}min</span>`
+             : '';
+
+          let html = `
+            <div class="day-header">
+              <div style="display:flex;align-items:center;gap:1rem;">
+                <div class="day-number">${d}</div>
+                <div><strong>${dayName}</strong> ${d}. ${months[this.month]}</div>
+              </div>
+              <div>${diffHtml}</div>
+            </div>`;
+
+          if (this.expanded === d){
+            html += `<div class="day-details">`;
+            for (let i=1; i<=3; i++){
+              const isChefEditing = (this.currentUser === 'chef') && this.viewedUser && this.viewedUser !== this.currentUser;
+              const inputsHtml = isChefEditing
+                ? `<input id="time-s-${d}-${i}" class="time-input" value="${entry['s'+i]||''}" onchange="app.update(${d},'s${i}',this.value)" placeholder="Start" onclick="event.stopPropagation()"> →
+                   <input id="time-e-${d}-${i}" class="time-input" value="${entry['e'+i]||''}" onchange="app.update(${d},'e${i}',this.value)" placeholder="Ende" onclick="event.stopPropagation()">`
+                : (canEdit
+                    ? `<div class="stamp-actions">
+     <button
+       class="btn-stamp btn-stamp--start"
+       onclick="event.stopPropagation(); app.stamp(${d}, ${i}, 's')"
+       ${entry['s'+i] ? 'disabled' : ''}>
+       🟢 Kommen
+     </button>
+
+     <span class="time-pill" id="time-sv-${d}-${i}">
+       ${entry['s'+i]||'--'}
+     </span>
+
+     <span class="sep-arrow">→</span>
+
+     <button
+       class="btn-stamp btn-stamp--end"
+       onclick="event.stopPropagation(); app.stamp(${d}, ${i}, 'e')"
+       ${entry['e'+i] ? 'disabled' : ''}>
+       🟠 Gehen
+     </button>
+
+     <span class="time-pill" id="time-ev-${d}-${i}">
+       ${entry['e'+i]||'--'}
+     </span>
+   </div>`
+
+                    : `<span>${entry['s'+i]||'--'} → ${entry['e'+i]||'--'}</span>`
+                  );
+              html += `<div style="margin-bottom:.75rem;"><label style="font-weight:600;margin-bottom:.35rem;display:block;">${i}. Zeitraum:</label>${inputsHtml}</div>`;
+            }
+            html += `</div>`;
+          }
+          card.innerHTML = html;
+          card.querySelector('.day-header').onclick = (ev) => { ev.stopPropagation(); this.expanded = this.expanded === d ? null : d; this.render(); };
+          list.appendChild(card);
+        }
+
+        // Monthly summary
+        const sign = total < 0 ? '-' : '+';
+        const abs = Math.abs(total);
+        const sumEl = document.getElementById('monthlySummary');
+        sumEl.className = 'monthly-summary ' + (total >= 0 ? 'positive' : 'negative');
+        document.getElementById('totalDisplay').textContent = `${sign}${Math.floor(abs/60)}h ${abs%60}min`;
+        document.getElementById('monthYearDisplay').textContent = `${months[this.month]} ${this.year}`;
+      },
+
+      update(day, field, value){
+        const yScroll = window.scrollY;
+        const mins = parseTime(value);
+        const val = (mins !== null) ? formatTime(mins) : '';
+        const userId = (this.currentUser === 'chef') ? this.viewedUser : this.currentUser;
+        if (!this.allUserData[userId]) this.allUserData[userId] = {};
+        setEntryCompat(this.allUserData[userId], this.year, this.month, day, field, val);
+        if (this.currentUser === 'chef'){
+  // local fallback
+  localStorage.setItem(`time_${userId}`, JSON.stringify(this.allUserData[userId]));
+  // + Cloud mentés a CHEF által szerkesztett (viewed) userhez
+  if (fb && fb.ready && fb.db) { this.cloudSaveFor(userId); }
+} else {
+  localStorage.setItem(`time_${this.currentUser}`, JSON.stringify(this.allUserData[this.currentUser]));
+  this.cloudSave();
+}
+        this.render(); window.scrollTo(0, yScroll);
+      },
+
+      focusTimeInput(day, idx, which){
+        const el = document.getElementById(`time-${which}-${day}-${idx}`);
+        if (el) { el.focus(); el.select(); }
+      },
+
+      handleTimeKey(ev, day, idx, which){
+        if (ev.key === 'Tab'){
+          ev.preventDefault();
+          const backwards = ev.shiftKey === true;
+          if (backwards){
+            if (which === 'e'){ this.focusTimeInput(day, idx, 's'); }
+            else {
+              if (idx > 1){ this.focusTimeInput(day, idx - 1, 'e'); }
+              else {
+                const prevDay = day - 1;
+                if (prevDay >= 1){ const y = window.scrollY; this.expanded = prevDay; this.render(); window.scrollTo(0, y); this.focusTimeInput(prevDay, 3, 'e'); }
+              }
+            }
+            return false;
+          }
+          if (which === 's'){ this.focusTimeInput(day, idx, 'e'); }
+          else {
+            if (idx < 3){ this.focusTimeInput(day, idx + 1, 's'); }
+            else {
+              const nextDay = day + 1; const daysInMonth = new Date(this.year, this.month + 1, 0).getDate();
+              if (nextDay <= daysInMonth){ const y = window.scrollY; this.expanded = nextDay; this.render(); window.scrollTo(0, y); this.focusTimeInput(nextDay, 1, 's'); }
+            }
+          }
+          return false;
+        }
+        return true;
+      },
+
+      
+      stamp(day, idx, which){
+        // which: 's' (Kommen) or 'e' (Gehen)
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2,'0');
+        const mm = String(now.getMinutes()).padStart(2,'0');
+        const val = hh + ':' + mm;
+        const field = (which === 's') ? ('s' + idx) : ('e' + idx);
+        this.update(day, field, val);
+      },
+
+exportData(){
+  if (this.currentUser !== 'chef') { showToast('Nur der Chef darf das.', true); return; }
+  const user = this.currentUser === 'chef' ? this.viewedUser : this.currentUser;
+  const data = this.allUserData[user] || {};
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${user}_backup_${this.year}-${this.month+1}.json`;
+  a.click();
+},
+
+
+exportExcel(){
+  if (this.currentUser !== 'chef') { showToast('Nur der Chef darf das.', true); return; }
+
+  const daysInMonth = new Date(this.year, this.month + 1, 0).getDate();
+  const user = this.currentUser === 'chef' ? this.viewedUser : this.currentUser;
+  const data = this.allUserData[user] || {};
+
+  let csv = 'Datum,Tag,Start,Ende,Arbeitszeit,Differenz\n';
+  let monthWorkMins = 0;
+  let monthDiffMins = 0;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const entry = getEntryCompat(data, this.year, this.month, d);
+
+    // napi ledolgozott percek
+    let dayWork = 0;
+    const pairs = [[entry.s1,entry.e1],[entry.s2,entry.e2],[entry.s3,entry.e3]];
+    for (const [ss,ee] of pairs) {
+      const ms = parseTime(ss), me = parseTime(ee);
+      if (ms != null && me != null && me > ms) dayWork += (me - ms);
+    }
+
+    const diff = calcDiff(entry);
+    const starts = [entry.s1,entry.s2,entry.s3].map(parseTime).filter(v => v != null);
+    const ends   = [entry.e1,entry.e2,entry.e3].map(parseTime).filter(v => v != null);
+    const startMins = starts.length ? Math.min(...starts) : null;
+    const endMins   = ends.length   ? Math.max(...ends)   : null;
+
+    monthWorkMins += dayWork;
+    monthDiffMins += diff;
+
+    const date = new Date(this.year, this.month, d);
+    const dayName = days[date.getDay()];
+    const dateStr = `${this.year}-${String(this.month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const diffSign = diff < 0 ? '-' : '+';
+    const diffAbs  = Math.abs(diff);
+
+    csv += [
+      dateStr,
+      dayName,
+      startMins != null ? formatTime(startMins) : '',
+      endMins   != null ? formatTime(endMins)   : '',
+      dayWork > 0 ? formatTime(dayWork) : '00:00',
+      `${diffSign}${Math.floor(diffAbs/60)}h ${diffAbs%60}min`
+    ].join(',') + '\n';
+  }
+
+  csv += '\n';
+  csv += `Monatsgesamt,,, ,${formatTime(Math.max(0, monthWorkMins))},\n`;
+  const monSign = monthDiffMins < 0 ? '-' : '+';
+  const monAbs  = Math.abs(monthDiffMins);
+  csv += `Monatsbilanz (± ggü. 8h/Tag),,,, ,${monSign}${Math.floor(monAbs/60)}h ${monAbs%60}min\n`;
+
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${user}_${this.year}-${String(this.month+1).padStart(2,'0')}.csv`;
+  a.click();
+},
+
+
+      async cloudLoadUser(userId){
+        if (!fb.ready || !userId) return false;
+        try {
+          const ref = fb.db.collection('timetracking').doc(userId);
+          const snap = await ref.get();
+          if (snap.exists) { const payload = snap.data() || {}; this.allUserData[userId] = payload.data || {}; return true; }
+          else { await ref.set({ data: {}, createdAt: new Date().toISOString() }, { merge: true }); this.allUserData[userId] = {}; return true; }
+        } catch (e) { console.warn('cloudLoadUser failed', userId, e); return false; }
+      },
+
+      async loadData(){
+        USERS.filter(u => u.id !== 'chef').forEach(u => { if (!this.allUserData[u.id]) this.allUserData[u.id] = {}; });
+        if (this.currentUser === 'chef') {
+          const targets = USERS.filter(u => u.id !== 'chef').map(u => u.id);
+          for (const u of targets){
+            let ok = false;
+            if (fb && fb.ready && fb.db) ok = await this.cloudLoadUser(u);
+            if (!ok){ const saved = localStorage.getItem(`time_${u}`); this.allUserData[u] = saved ? JSON.parse(saved) : {}; }
+          }
+          return;
+        }
+        const ref = this.cloudDocRef();
+        if (ref){
+          try {
+            const snap = await ref.get();
+            if (snap.exists){ const payload = snap.data() || {}; this.allUserData[this.currentUser] = payload.data || {}; return; }
+            else { await ref.set({ data: {}, createdAt: new Date().toISOString() }, { merge: true }); this.allUserData[this.currentUser] = {}; return; }
+          } catch (e) { console.warn('Cloud load failed', e); }
+        }
+        const saved = localStorage.getItem(`time_${this.currentUser}`);
+        this.allUserData[this.currentUser] = saved ? JSON.parse(saved) : {};
+      },
+
+      async saveData(){ localStorage.setItem(`time_${this.currentUser}`, JSON.stringify(this.allUserData[this.currentUser])); this.cloudSave(); },
+
+      getDisplayData(){ return (this.currentUser === 'chef') ? (this.allUserData[this.viewedUser] || {}) : (this.allUserData[this.currentUser] || {}); },
+      cloudDocRef(){ if (!fb.ready || !this.currentUser) return null; return fb.db.collection('timetracking').doc(this.currentUser); },
+
+      scrollToToday(open = true){
+  // Chef-nél nincs autó-nyitás és görgetés
+  if (this.currentUser === 'chef') return;
+
+  const today = new Date();
+  if (today.getMonth() === this.month && today.getFullYear() === this.year){
+    if (open) {
+      this.expanded = today.getDate();
+      this.render();
+    }
+    const el = document.getElementById(`day-${today.getDate()}`);
+    if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  }
+},
+
+      logout(){
+        this.currentUser = null;
+        localStorage.removeItem('currentUser');
+        this.allUserData = {};
+        document.getElementById('userModal').classList.remove('hidden');
+        this.showUserSelection();
+      },
+
+      clearAllData(){
+  if (this.currentUser !== 'chef') { showToast('Nur der Chef darf das.', true); return; }
+  if (confirm('Alle Daten löschen?')){
+    // Chef törlése logikád: pl. current viewed user adatai vagy globális – ezt hagyd a jelenlegi belső kód szerint
+    this.allUserData[this.viewedUser || this.currentUser] = {};
+    this.saveData(); this.render(); this.scrollToToday(); showToast('🗑️ Daten gelöscht');
+  }
+}
+    };
+
+    window.onload = () => {
+      initCloudIfConfigured();
+      app.init();
+      setInterval(()=>{ if(app.currentUser) app.loadData().then(()=>app.render()); }, 30000);
+    };
+  </script>
+  <div id="toast" class="toast"></div>
+</body>
+</html>
