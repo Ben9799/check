@@ -278,7 +278,6 @@ select:focus{
 
   <div class="header" id="header">
     <div class="current-user-badge">
-      <span id="userAvatar">👤</span>
       <span id="userName">Benutzer</span>
 
     </div>
@@ -372,11 +371,12 @@ select:focus{
     let fb = { app: null, auth: null, db: null, ready: false };
 
     // ===== Users state (dynamic) =====
-    let USERS = [
-      { id:'thomas', name:'Thomas', pass:'831531', avatar:'👨‍💼', role:'user', badgeClass:'thomas' },
-      { id:'bence',  name:'Bence',  pass:'150619', avatar:'👨‍💻', role:'user', badgeClass:'bence'  },
-      { id:'chef',   name:'Chef',   pass:'000000', avatar:'👨‍🍳', role:'chef', badgeClass:'chef'   },
-    ];
+   let USERS = [
+  { id:'thomas', name:'Thomas', pass:'831531', role:'user', badgeClass:'thomas' },
+  { id:'bence',  name:'Bence',  pass:'150619', role:'user', badgeClass:'bence'  },
+  { id:'chef',   name:'Chef',   pass:'000000', role:'chef',  badgeClass:'chef'   },
+];
+
 
     function initCloudIfConfigured() {
       try {
@@ -410,11 +410,12 @@ select:focus{
             const snap = await fb.db.collection('users').get();
             const arr = []; snap.forEach(doc => arr.push({ id: doc.id, ...doc.data() }));
             if (arr.length){
-              USERS = arr.map(x => ({
-                id: x.id, name: x.name || x.id, pass: x.pass || '',
-                avatar: x.avatar || '👤', role: x.role || 'user',
-                badgeClass: x.badgeClass || (x.id in {thomas:1,bence:1,chef:1}? x.id : 'other')
-              }));
+             USERS = arr.map(x => ({
+  id: x.id, name: x.name || x.id, pass: x.pass || '',
+  role: x.role || 'user',
+  badgeClass: x.badgeClass || (x.id in {thomas:1,bence:1,chef:1}? x.id : 'other')
+}));
+
             } else {
               await Promise.all(USERS.map(u => fb.db.collection('users').doc(u.id).set(u, {merge:true})));
             }
@@ -714,8 +715,7 @@ refreshUserDependentUI(){
 
       updateUI(){
         const isChef = this.currentUser === 'chef';
-        const info = USERS.find(u => u.id === this.currentUser) || {name:'Benutzer', avatar:'👤'};
-        document.getElementById('userAvatar').textContent = info.avatar;
+       const info = USERS.find(u => u.id === this.currentUser) || { name:'Benutzer' };
         document.getElementById('userName').textContent = info.name;
         let headerClass = 'header'; if (isChef) headerClass += ' chef-mode'; else if (this.currentUser==='bence') headerClass += ' bence-mode';
         document.getElementById('header').className = headerClass;
