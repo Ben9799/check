@@ -292,7 +292,7 @@ select:focus{
 
   <div class="container">
     <div class="control-panel" id="controlPanel">
-      <div id="chefView" class="chef-view-info hidden">Chef-Ansicht: Alle Mitarbeiter</div>
+      <div id="chefView" class="chef-view-info hidden">Thomas Pertl – Ansicht: Alle Mitarbeiter</div>
       <div id="userTabsContainer" class="user-tabs hidden"></div>
 
       <div class="controls-top">
@@ -374,7 +374,7 @@ select:focus{
    let USERS = [
   { id:'thomas', name:'Thomas', pass:'831531', role:'user', badgeClass:'thomas' },
   { id:'bence',  name:'Bence',  pass:'150619', role:'user', badgeClass:'bence'  },
-  { id:'chef',   name:'Chef',   pass:'000000', role:'chef',  badgeClass:'chef'   },
+  { id:'chef',   name:'Thomas Pertl',   pass:'000000', role:'chef',  badgeClass:'chef'   },
 ];
 
 
@@ -572,7 +572,7 @@ select:focus{
         const sel = document.getElementById('vacUser'); if (!sel) return;
         sel.innerHTML = '';
         USERS.filter(u => u.role !== 'chef').forEach(u => { const opt = document.createElement('option'); opt.value = u.id; opt.textContent = u.name; sel.appendChild(opt); });
-        const optChef = document.createElement('option'); optChef.value = 'chef'; optChef.textContent = 'Chef'; sel.appendChild(optChef);
+       const optChef = document.createElement('option'); optChef.value = 'chef'; optChef.textContent = 'Thomas Pertl'; sel.appendChild(optChef);
         const optOther = document.createElement('option'); optOther.value = 'other'; optOther.textContent = 'Andere'; sel.appendChild(optOther);
       },
       bindRealtime(){
@@ -752,7 +752,10 @@ chefOnly.forEach(id => {
         if (this.currentUser === 'chef') {
           const total = nonChefUsers.reduce((sum, u) => sum + pendingCount(u.id), 0);
           const chefView = document.getElementById('chefView');
-          if (chefView) { chefView.textContent = total > 0 ? `Chef-Ansicht: Alle Mitarbeiter — Urlaub beantragt: ${total}` : `Chef-Ansicht: Alle Mitarbeiter`; }
+         if (chefView) {
+  chefView.textContent = total > 0
+    ? `Thomas Pertl – Ansicht: Alle Mitarbeiter — Urlaub beantragt: ${total}`
+    : `Thomas Pertl – Ansicht: Alle Mitarbeiter`;}
         }
         nonChefUsers.forEach(u => {
           const tab = document.createElement('button');
