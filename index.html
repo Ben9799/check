@@ -35,7 +35,7 @@
     .controls-top{ display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:1rem; }
     select{ padding:.6rem .8rem; border-radius:.6rem; border:2px solid #93c5fd; font-weight:600; }
     .button-group { display:flex; gap:.5rem; flex-wrap:wrap; }
-    button{ padding:.6rem .9rem; border:none; border-radius:.6rem; font-weight:700; cursor:pointer; display:flex; gap:.4rem; align-items:center; }
+    button{ padding:.6rem .9rem; border:none; border-radius:.6rem; font-weight:700; cursor:default; display:flex; gap:.4rem; align-items:center; }
     .btn-blue{ background:#2563eb; color:#fff; } .btn-amber{ background:#d97706; color:#fff; } .btn-green{ background:#16a34a; color:#fff; } .btn-red{ background:#dc2626; color:#fff; }
     .monthly-summary{ border-radius:.75rem; padding:1rem; display:flex; align-items:center; justify-content:space-between; border:2px solid; }
     .monthly-summary.positive{ background:linear-gradient(to right,#f0fdf4,#dcfce7); border-color:#86efac; }
@@ -277,10 +277,10 @@ select:focus{
   </div>
 
   <div class="header" id="header">
-    <div class="current-user-badge" onclick="app.showUserSelection()">
+    <div class="current-user-badge">
       <span id="userAvatar">👤</span>
       <span id="userName">Benutzer</span>
-      <span>🔄</span>
+
     </div>
     <div class="header-content">
       <div>
@@ -699,6 +699,7 @@ selectUser(userId){
 ,
 
       showUserSelection(){
+        if (this.currentUser) return;
         document.getElementById('userModal').classList.remove('hidden');
         document.getElementById('passwordInput').value = '';
         document.getElementById('errorMsg').style.display = 'none';
